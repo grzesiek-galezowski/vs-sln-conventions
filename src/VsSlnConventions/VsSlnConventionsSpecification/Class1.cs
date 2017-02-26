@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using FluentAssertions;
 using FubuCsProjFile;
 using TddEbook.TddToolkit;
 using Xunit;
@@ -20,40 +15,32 @@ namespace VsSlnConventionsSpecification
     public void ShouldWhatever() //bug
     {
       var projectName = Any.Identifier();
-      var testProjectSuffix = Any.Identifier();
+      var testProjectSuffix = "Specification"; //bug configurable suffix
       var testProjectName = projectName + testProjectSuffix;
 
       var sln = Solution.CreateNew(SlnDirectory, SlnFileName);
       sln.AddProject(projectName);
       sln.AddProject(testProjectName);
 
-      using (new SolutionScope(sln))
-      using (var stringWriter = ConsoleToStringWriter())
+      var conventionsApp = new VsConventionsDriver(SlnDirectory, SlnFileName);
+
+      string output;
+      using (new PhysicalSolutionExistenceScope(sln))
       {
-        var conventionsApp = new VsConventionsDriver(SlnDirectory, SlnFileName);
-        conventionsApp.Run();
-
-        var output = stringWriter.ToString();
-
-        conventionsApp.Result.Should().Be(0);
-        output.Should().Contain($"{projectName} has a specification: {testProjectName}");
-        output.Should().Contain($"{testProjectName} has a production project: {projectName}");
+        output = conventionsApp.Run();
       }
-    }
 
-    private static StringWriter ConsoleToStringWriter()
-    {
-      var consoleToStringWriter = new StringWriter();
-      Console.SetOut(consoleToStringWriter); //bug command-query violation
-      return consoleToStringWriter;
+      conventionsApp.Should.ReportSuccess();
+      conventionsApp.Should.ContainProductionToTestProjectMatch(output, projectName, testProjectName);
+      conventionsApp.Should.ContainTestToProductionProjectMatch(output, testProjectName, projectName);
     }
   }
 
-  public class SolutionScope : IDisposable
+  public class PhysicalSolutionExistenceScope : IDisposable
   {
     private readonly Solution _sln;
 
-    public SolutionScope(Solution sln)
+    public PhysicalSolutionExistenceScope(Solution sln)
     {
       _sln = sln;
       sln.Save();
@@ -66,30 +53,4 @@ namespace VsSlnConventionsSpecification
 
   }
 
-  public class VsConventionsDriver
-  {
-    private readonly string _slnDirectory;
-    private readonly string _slnFileName;
-
-    public VsConventionsDriver(string slnDirectory, string slnFileName)
-    {
-      _slnDirectory = slnDirectory;
-      _slnFileName = slnFileName;
-    }
-
-    public int Result { get; private set; }
-
-    public void Run()
-    {
-      var solution = Solution.LoadFrom(Path.Combine(_slnDirectory, _slnFileName));
-    }
-  }
-
-  public class ConventionsResult
-  {
-  }
-
-  public class ConventionsDomainLogic
-  {
-  }
 }
